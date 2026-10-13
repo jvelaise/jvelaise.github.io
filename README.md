@@ -1,7 +1,7 @@
 # jvelaise.github.io
 Jean-Louis Velaise web site
 
-Born in Paris, home is Los Angeles
+Born in Paris, home is Los Angeles and UK
 Test 12 oct
 
 
