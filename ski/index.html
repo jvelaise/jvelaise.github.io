@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Europe Ski Map</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    :root {
+      --text: #1f2933;
+      --muted: #616e7c;
+      --accent: #8c1515;
+      --snow: #1d5fa8;
+      --line: #e4e7eb;
+      --bg: #fdfdfc;
+      --panel: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      color: var(--text);
+      background: var(--bg);
+    }
+    header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    header h1 { font-size: 1.4rem; margin: 0; }
+    header p { margin: 0; color: var(--muted); }
+    header a { color: var(--accent); margin-left: auto; text-decoration: none; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      height: calc(100vh - 62px);
+    }
+    aside {
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .controls { padding: 1rem; border-bottom: 1px solid var(--line); display: grid; gap: .5rem; }
+    .controls input[type=search], .controls select {
+      width: 100%; padding: .5rem .6rem; font: inherit;
+      border: 1px solid var(--line); border-radius: 6px; background: #fff;
+    }
+    .controls label { font-size: .9rem; color: var(--muted); display: flex; gap: .4rem; align-items: center; }
+    .list { overflow-y: auto; flex: 1; margin: 0; padding: 0; list-style: none; }
+    .list li {
+      padding: .7rem 1rem; border-bottom: 1px solid var(--line); cursor: pointer;
+    }
+    .list li:hover, .list li.active { background: #f5f7fa; }
+    .list li.active { box-shadow: inset 3px 0 0 var(--accent); }
+    .list .name { font-weight: 600; }
+    .list .meta { font-size: .85rem; color: var(--muted); }
+    .badge {
+      display: inline-block; font-size: .72rem; font-weight: 600;
+      background: var(--accent); color: #fff; border-radius: 999px; padding: 0 .45rem; margin-left: .3rem;
+      vertical-align: middle;
+    }
+
+    #map { height: 100%; }
+
+    .detail { padding: 1rem; border-bottom: 1px solid var(--line); background: #fbfbfa; max-height: 55%; overflow-y: auto; }
+    .detail[hidden] { display: none; }
+    .detail h2 { margin: 0; font-size: 1.15rem; }
+    .detail .close { float: right; border: 0; background: none; font-size: 1.2rem; cursor: pointer; color: var(--muted); }
+    .detail p { margin: .4rem 0; }
+    .detail h3 {
+      font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--accent);
+      margin: 1rem 0 .4rem;
+    }
+    .detail table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    .detail td { padding: .25rem 0; border-bottom: 1px solid var(--line); }
+    .detail td:last-child { text-align: right; color: var(--muted); }
+
+    .note { border: 1px solid var(--line); border-radius: 8px; padding: .6rem .75rem; margin-bottom: .6rem; background: #fff; }
+    .note .subject { font-weight: 600; }
+    .note .from { font-size: .82rem; color: var(--muted); }
+    .note dl { display: grid; grid-template-columns: auto 1fr; gap: .15rem .6rem; margin: .4rem 0 0; font-size: .88rem; }
+    .note dt { color: var(--muted); }
+    .note dd { margin: 0; }
+    .empty { color: var(--muted); font-size: .9rem; font-style: italic; }
+
+    .airport-icon {
+      background: #fff; border: 1.5px solid var(--text); border-radius: 4px;
+      font-size: 11px; line-height: 16px; text-align: center; font-weight: 700;
+    }
+    .leaflet-popup-content { margin: .6rem .8rem; }
+
+    section.all-notes { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    section.all-notes h2 {
+      font-size: 1.1rem; text-transform: uppercase; letter-spacing: .08em; color: var(--accent);
+    }
+
+    @media (max-width: 760px) {
+      .layout { grid-template-columns: 1fr; grid-template-rows: 55vh auto; height: auto; }
+      #map { grid-row: 1; height: 55vh; }
+      aside { grid-row: 2; border-right: 0; }
+      .list { max-height: 60vh; }
+      .detail { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Top ski destinations in Europe</h1>
+    <p>Resorts, nearby airports and notes from emails</p>
+    <a href="../">← Home</a>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <div class="controls">
+        <input id="search" type="search" placeholder="Search resorts…">
+        <select id="country"><option value="">All countries</option></select>
+        <label><input id="showAirports" type="checkbox" checked> Show airports</label>
+        <label><input id="onlyNotes" type="checkbox"> Only resorts with email notes</label>
+      </div>
+      <div class="detail" id="detail" hidden></div>
+      <ul class="list" id="list"></ul>
+    </aside>
+    <div id="map"></div>
+  </div>
+
+  <section class="all-notes">
+    <h2>Email summaries</h2>
+    <div id="allNotes"></div>
+  </section>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="data.js"></script>
+  <script src="email-notes.js"></script>
+  <script>
+    const resorts = window.RESORTS;
+    const airports = window.AIRPORTS;
+    const notes = window.EMAIL_NOTES || [];
+    const notesFor = id => notes.filter(n => n.resort === id).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const byId = Object.fromEntries(resorts.map(r => [r.id, r]));
+
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    // Map
+    const map = L.map("map", { zoomSnap: 0.5 }).setView([47, 9], 5);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    const airportLayer = L.layerGroup().addTo(map);
+    const routeLayer = L.layerGroup().addTo(map);
+    const resortMarkers = {};
+
+    for (const [code, a] of Object.entries(airports)) {
+      L.marker([a.lat, a.lng], {
+        icon: L.divIcon({ className: "airport-icon", html: "✈", iconSize: [18, 18] }),
+        title: `${a.name} (${code})`
+      }).bindPopup(`<strong>✈ ${esc(a.name)}</strong> (${code})`).addTo(airportLayer);
+    }
+
+    for (const r of resorts) {
+      const hasNotes = notesFor(r.id).length > 0;
+      const m = L.circleMarker([r.lat, r.lng], {
+        radius: 7, weight: 2, color: "#fff",
+        fillColor: hasNotes ? getComputedStyle(document.documentElement).getPropertyValue("--accent") : "#1d5fa8",
+        fillOpacity: 1
+      }).bindTooltip(r.name).on("click", () => select(r.id));
+      m.addTo(map);
+      resortMarkers[r.id] = m;
+    }
+
+    // Sidebar
+    const listEl = document.getElementById("list");
+    const detailEl = document.getElementById("detail");
+    const searchEl = document.getElementById("search");
+    const countryEl = document.getElementById("country");
+    const onlyNotesEl = document.getElementById("onlyNotes");
+
+    [...new Set(resorts.map(r => r.country))].sort().forEach(c => {
+      countryEl.insertAdjacentHTML("beforeend", `<option>${esc(c)}</option>`);
+    });
+
+    let selected = null;
+
+    function renderList() {
+      const q = searchEl.value.trim().toLowerCase();
+      const c = countryEl.value;
+      const only = onlyNotesEl.checked;
+      listEl.innerHTML = "";
+      for (const r of resorts) {
+        const count = notesFor(r.id).length;
+        const visible = (!q || r.name.toLowerCase().includes(q) || r.country.toLowerCase().includes(q))
+          && (!c || r.country === c) && (!only || count > 0);
+        const m = resortMarkers[r.id];
+        if (visible) { if (!map.hasLayer(m)) m.addTo(map); } else { m.remove(); }
+        if (!visible) continue;
+        const li = document.createElement("li");
+        li.className = r.id === selected ? "active" : "";
+        li.innerHTML = `<div class="name">${esc(r.name)}${count ? `<span class="badge">${count} ✉</span>` : ""}</div>
+          <div class="meta">${esc(r.country)} · ${esc(r.alt)} · ${r.pistes} km · ✈ ${r.airports.map(a => a[0]).join(", ")}</div>`;
+        li.onclick = () => select(r.id);
+        listEl.appendChild(li);
+      }
+    }
+
+    function noteHtml(n, showResort) {
+      const details = n.details ? Object.entries(n.details).filter(([, v]) => v) : [];
+      return `<div class="note">
+        ${showResort && byId[n.resort] ? `<div class="from"><a href="#" data-resort="${esc(n.resort)}">${esc(byId[n.resort].name)}</a></div>` : ""}
+        <div class="subject">${esc(n.subject || "(no subject)")}</div>
+        <div class="from">${esc([n.from, n.date].filter(Boolean).join(" · "))}</div>
+        ${n.summary ? `<p>${esc(n.summary)}</p>` : ""}
+        ${details.length ? `<dl>${details.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}
+      </div>`;
+    }
+
+    function select(id) {
+      const r = byId[id];
+      if (!r) return;
+      selected = id;
+      routeLayer.clearLayers();
+
+      const points = [[r.lat, r.lng]];
+      for (const [code, time] of r.airports) {
+        const a = airports[code];
+        if (!a) continue;
+        points.push([a.lat, a.lng]);
+        L.polyline([[r.lat, r.lng], [a.lat, a.lng]], { color: "#8c1515", weight: 2, dashArray: "5 6" })
+          .bindTooltip(`${code} · ~${time}`, { sticky: true }).addTo(routeLayer);
+      }
+      map.flyToBounds(points, { padding: [60, 60], maxZoom: 9, duration: 0.8 });
+
+      const rNotes = notesFor(id);
+      detailEl.hidden = false;
+      detailEl.innerHTML = `
+        <button class="close" aria-label="Close" onclick="clearSelection()">×</button>
+        <h2>${esc(r.name)}</h2>
+        <p class="meta" style="color:var(--muted)">${esc(r.country)} · ${esc(r.alt)} · ${r.pistes} km of pistes</p>
+        <p>${esc(r.blurb)}</p>
+        <h3>Nearest airports</h3>
+        <table>${r.airports.map(([code, time]) =>
+          `<tr><td><strong>${code}</strong> ${esc(airports[code]?.name)}</td><td>~${time} transfer</td></tr>`).join("")}</table>
+        <h3>From emails (${rNotes.length})</h3>
+        ${rNotes.length ? rNotes.map(n => noteHtml(n, false)).join("") : `<p class="empty">No email notes yet.</p>`}`;
+      detailEl.scrollTop = 0;
+      renderList();
+    }
+
+    function clearSelection() {
+      selected = null;
+      routeLayer.clearLayers();
+      detailEl.hidden = true;
+      renderList();
+    }
+
+    function renderAllNotes() {
+      const el = document.getElementById("allNotes");
+      const sorted = [...notes].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      el.innerHTML = sorted.length ? sorted.map(n => noteHtml(n, true)).join("")
+        : `<p class="empty">No emails summarised yet.</p>`;
+      el.querySelectorAll("a[data-resort]").forEach(a => a.onclick = e => {
+        e.preventDefault();
+        select(a.dataset.resort);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
+
+    searchEl.oninput = renderList;
+    countryEl.onchange = renderList;
+    onlyNotesEl.onchange = renderList;
+    document.getElementById("showAirports").onchange = e =>
+      e.target.checked ? airportLayer.addTo(map) : airportLayer.remove();
+
+    renderList();
+    renderAllNotes();
+  </script>
+</body>
+</html>
