@@ -38,7 +38,7 @@
     .layout {
       display: grid;
       grid-template-columns: 340px 1fr;
-      height: calc(100vh - 62px);
+      height: max(480px, calc(100vh - 62px));
     }
     aside {
       border-right: 1px solid var(--line);
@@ -102,8 +102,8 @@
     }
 
     @media (max-width: 760px) {
-      .layout { grid-template-columns: 1fr; grid-template-rows: 55vh auto; height: auto; }
-      #map { grid-row: 1; height: 55vh; }
+      .layout { grid-template-columns: 1fr; grid-template-rows: auto auto; height: auto; }
+      #map { grid-row: 1; height: max(360px, 55vh); }
       aside { grid-row: 2; border-right: 0; }
       .list { max-height: 60vh; }
       .detail { max-height: none; }
