@@ -18,14 +18,25 @@
   </header>
 
   <main>
-    <h2>Average flight ticket cost</h2>
-    <p class="intro">Average round-trip fare to each airport near the resorts.</p>
-    <div class="placeholder"><strong>Placeholder:</strong> fares to come. Values below are blank until a source is chosen.</div>
+    <h2>Flight costs from London</h2>
+    <p class="intro">Cheapest one-way fare from any London airport to each ski airport, departing in
+      the next 7 days. Prices are estimates from fares other travellers found recently on
+      <a href="https://www.aviasales.com/">Aviasales</a>, so always check the live price before booking.
+      Click a column heading to sort.</p>
+    <p class="status" id="status">Loading fares…</p>
 
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Airport</th><th>Serves</th><th>Avg round trip</th><th>From</th><th>Season</th></tr>
+          <tr>
+            <th data-sort="code">Airport</th>
+            <th data-sort="serves">Serves</th>
+            <th data-sort="price" class="num">Cheapest one-way</th>
+            <th data-sort="date">Date</th>
+            <th data-sort="airline">Airline</th>
+            <th data-sort="transfers" class="num">Stops</th>
+            <th>Check price</th>
+          </tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>
@@ -34,12 +45,90 @@
 
   <script src="data.js"></script>
   <script>
+    const AIRLINES = {
+      U2: "easyJet", DS: "easyJet", EC: "easyJet", FR: "Ryanair", RK: "Ryanair UK", BA: "British Airways",
+      LS: "Jet2", W6: "Wizz Air", W9: "Wizz Air UK", VY: "Vueling", IB: "Iberia", LX: "Swiss",
+      LH: "Lufthansa", EW: "Eurowings", OS: "Austrian", AF: "Air France", KL: "KLM", AZ: "ITA Airways",
+      SK: "SAS", DY: "Norwegian", D8: "Norwegian", AY: "Finnair", LO: "LOT", FB: "Bulgaria Air",
+      BT: "airBaltic", TK: "Turkish Airlines", EI: "Aer Lingus", A3: "Aegean", SN: "Brussels Airlines"
+    };
+    const LONDON = { LHR: "Heathrow", LGW: "Gatwick", STN: "Stansted", LTN: "Luton", LCY: "City", SEN: "Southend" };
+
+    const airports = window.AIRPORTS;
     const served = {};
     for (const r of window.RESORTS) for (const [code] of r.airports) (served[code] ||= []).push(r.name);
-    document.getElementById("rows").innerHTML = Object.entries(window.AIRPORTS).map(([code, a]) =>
-      `<tr><td><strong>${code}</strong> ${a.name}</td>` +
-      `<td class="country">${(served[code] || []).join(", ")}</td>` +
-      `<td class="tbd">—</td>`.repeat(3) + `</tr>`).join("");
+
+    const rowsEl = document.getElementById("rows");
+    const statusEl = document.getElementById("status");
+    const gbp = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
+    // Use the calendar date as written (local to the airport), not shifted into the viewer's time zone
+    const day = iso => new Date(`${iso.slice(0, 10)}T12:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+
+    let rows = Object.keys(airports).map(code => ({ code, serves: (served[code] || []).join(", ") }));
+    let sortKey = "price", sortDir = 1;
+    let loaded = false;
+
+    function googleFlights(code, date) {
+      const q = `Flights from London to ${code}${date ? ` on ${date.slice(0, 10)}` : ""} one way`;
+      return `https://www.google.com/travel/flights?q=${encodeURIComponent(q)}`;
+    }
+
+    function render() {
+      const sorted = [...rows].sort((a, b) => {
+        const x = a[sortKey], y = b[sortKey];
+        if (x == null && y == null) return a.code.localeCompare(b.code);
+        if (x == null) return 1;   // no fare: always last
+        if (y == null) return -1;
+        return (typeof x === "string" ? x.localeCompare(y) : x - y) * sortDir;
+      });
+      const blank = loaded ? "No recent fare" : "…";
+      rowsEl.innerHTML = sorted.map(r => `<tr>
+        <td><strong>${r.code}</strong> ${airports[r.code].name}</td>
+        <td class="country">${r.serves}</td>
+        <td class="num">${r.price != null ? `<strong>${gbp.format(r.price)}</strong>` : `<span class="country">${blank}</span>`}</td>
+        <td>${r.date ? day(r.date) : ""}${r.from ? ` <span class="country">from ${r.from}</span>` : ""}</td>
+        <td>${r.airline || ""}</td>
+        <td class="num">${r.transfers == null ? "" : r.transfers === 0 ? "Direct" : r.transfers}</td>
+        <td>${r.link ? `<a href="${r.link}" target="_blank" rel="noopener">Aviasales</a> · ` : ""}<a href="${googleFlights(r.code, r.date)}" target="_blank" rel="noopener">Google Flights</a></td>
+      </tr>`).join("");
+    }
+
+    document.querySelectorAll("th[data-sort]").forEach(th => th.onclick = () => {
+      const key = th.dataset.sort;
+      sortDir = key === sortKey ? -sortDir : 1;
+      sortKey = key;
+      render();
+    });
+
+    render();
+
+    fetch("/api/fares").then(async res => {
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `server returned ${res.status}`);
+      return body;
+    }).then(data => {
+      rows = rows.map(r => {
+        const f = data.fares[r.code];
+        if (!f) return r;
+        return {
+          ...r,
+          price: f.price,
+          date: f.departure_at,
+          from: LONDON[f.origin_airport] || f.origin_airport,
+          airline: AIRLINES[f.airline] || f.airline,
+          transfers: f.transfers,
+          link: f.link
+        };
+      });
+      loaded = true;
+      const found = rows.filter(r => r.price != null).length;
+      statusEl.textContent = `Departures ${day(data.from)} – ${day(data.to)}. Fares found for ${found} of ${rows.length} airports. Updated ${new Date(data.updated).toLocaleString()}.`;
+      render();
+    }).catch(err => {
+      loaded = true;
+      statusEl.textContent = `Couldn't load fares (${err.message}). The Google Flights links still work.`;
+      render();
+    });
   </script>
 </body>
 </html>
