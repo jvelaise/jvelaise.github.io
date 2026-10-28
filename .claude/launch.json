@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "site",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /private/tmp/claude-501/-Users-velaisehomeoffice--claude-spares-spare-pCwDcj/3b085aa2-abb9-4888-9e0a-7c36a7731866/scratchpad/site && python3 -m http.server 8791"],
+      "port": 8791
+    }
+  ]
+}
