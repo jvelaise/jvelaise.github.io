@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avg flight ticket cost · JLV trips</title>
+  <link rel="stylesheet" href="pages.css">
+</head>
+<body>
+  <header>
+    <h1><a href="./">JLV trips</a></h1>
+    <nav>
+      <a href="./">Map</a>
+      <a href="snow.html">Current snow report</a>
+      <a href="flights.html" aria-current="page">Avg flight ticket cost</a>
+      <a href="sources.html">Sources</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2>Average flight ticket cost</h2>
+    <p class="intro">Average round-trip fare to each airport near the resorts.</p>
+    <div class="placeholder"><strong>Placeholder:</strong> fares to come. Values below are blank until a source is chosen.</div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Airport</th><th>Serves</th><th>Avg round trip</th><th>From</th><th>Season</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="data.js"></script>
+  <script>
+    const served = {};
+    for (const r of window.RESORTS) for (const [code] of r.airports) (served[code] ||= []).push(r.name);
+    document.getElementById("rows").innerHTML = Object.entries(window.AIRPORTS).map(([code, a]) =>
+      `<tr><td><strong>${code}</strong> ${a.name}</td>` +
+      `<td class="country">${(served[code] || []).join(", ")}</td>` +
+      `<td class="tbd">—</td>`.repeat(3) + `</tr>`).join("");
+  </script>
+</body>
+</html>

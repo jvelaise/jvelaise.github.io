@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Current snow report · JLV trips</title>
+  <link rel="stylesheet" href="pages.css">
+</head>
+<body>
+  <header>
+    <h1><a href="./">JLV trips</a></h1>
+    <nav>
+      <a href="./">Map</a>
+      <a href="snow.html" aria-current="page">Current snow report</a>
+      <a href="flights.html">Avg flight ticket cost</a>
+      <a href="sources.html">Sources</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2>Current snow report</h2>
+    <p class="intro">Snow conditions at each resort.</p>
+    <div class="placeholder"><strong>Placeholder:</strong> data to come. Values below are blank until a source is chosen.</div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Resort</th><th>Snow depth (top)</th><th>Snow depth (base)</th><th>New snow (7 days)</th><th>Lifts open</th><th>Last updated</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="data.js"></script>
+  <script>
+    document.getElementById("rows").innerHTML = window.RESORTS.map(r =>
+      `<tr><td>${r.name} <span class="country">${r.country}</span></td>` +
+      `<td class="tbd">—</td>`.repeat(5) + `</tr>`).join("");
+  </script>
+</body>
+</html>

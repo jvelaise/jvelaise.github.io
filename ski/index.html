@@ -33,7 +33,13 @@
     }
     header h1 { font-size: 1.4rem; margin: 0; }
     header p { margin: 0; color: var(--muted); }
-    header a { color: var(--accent); margin-left: auto; text-decoration: none; }
+    header > a { color: var(--accent); text-decoration: none; }
+    nav { display: flex; gap: .5rem; flex-wrap: wrap; margin-left: auto; }
+    nav a {
+      padding: .35rem .8rem; border: 1px solid var(--accent); border-radius: 999px;
+      color: var(--accent); text-decoration: none; font-size: .9rem; white-space: nowrap;
+    }
+    nav a:hover { background: var(--accent); color: #fff; }
 
     .layout {
       display: grid;
@@ -114,6 +120,11 @@
   <header>
     <h1>JLV trips</h1>
     <p>Top ski destinations in Europe: resorts, nearby airports and notes from emails</p>
+    <nav>
+      <a href="snow.html">Current snow report</a>
+      <a href="flights.html">Avg flight ticket cost</a>
+      <a href="sources.html">Sources</a>
+    </nav>
     <a href="../">← Home</a>
   </header>
 
