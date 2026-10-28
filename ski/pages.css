@@ -44,6 +44,11 @@ table { width: 100%; border-collapse: collapse; font-size: .92rem; background: #
 th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--line); }
 th { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 td.tbd { color: var(--muted); }
+th[data-sort] { cursor: pointer; user-select: none; }
+th[data-sort]:hover { color: var(--accent); }
+.num { text-align: right; white-space: nowrap; }
+.status { font-size: .9rem; color: var(--muted); }
+main a { color: var(--accent); }
 .country { color: var(--muted); font-size: .85rem; }
 
 ul.sources { padding-left: 1.2rem; }

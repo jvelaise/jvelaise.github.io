@@ -19,13 +19,22 @@
 
   <main>
     <h2>Current snow report</h2>
-    <p class="intro">Snow conditions at each resort.</p>
-    <div class="placeholder"><strong>Placeholder:</strong> data to come. Values below are blank until a source is chosen.</div>
+    <p class="intro">Snow at each resort's summit and base, from the
+      <a href="https://open-meteo.com/">Open-Meteo</a> weather model. These are modelled
+      values and can differ from the resort's own report. Click a column heading to sort.</p>
+    <p class="status" id="status">Loading snow data…</p>
 
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Resort</th><th>Snow depth (top)</th><th>Snow depth (base)</th><th>New snow (7 days)</th><th>Lifts open</th><th>Last updated</th></tr>
+          <tr>
+            <th data-sort="name">Resort</th>
+            <th data-sort="topDepth" class="num">Snow depth (summit)</th>
+            <th data-sort="baseDepth" class="num">Snow depth (base)</th>
+            <th data-sort="past7" class="num">New snow (last 7 days)</th>
+            <th data-sort="next7" class="num">Forecast (next 7 days)</th>
+            <th data-sort="topTemp" class="num">Summit temp now</th>
+          </tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>
@@ -34,9 +43,82 @@
 
   <script src="data.js"></script>
   <script>
-    document.getElementById("rows").innerHTML = window.RESORTS.map(r =>
-      `<tr><td>${r.name} <span class="country">${r.country}</span></td>` +
-      `<td class="tbd">—</td>`.repeat(5) + `</tr>`).join("");
+    const resorts = window.RESORTS;
+    const rowsEl = document.getElementById("rows");
+    const statusEl = document.getElementById("status");
+
+    // "1,035–3,842 m" -> [1035, 3842]
+    const elevations = r => r.alt.replace(/,/g, "").match(/\d+/g).map(Number);
+
+    const sum = a => a.reduce((t, v) => t + (v || 0), 0);
+    const cm = v => v == null ? "—" : `${Math.round(v)} cm`;
+    const deg = v => v == null ? "—" : `${Math.round(v)}°C`;
+
+    let rows = resorts.map(r => ({ name: r.name, country: r.country }));
+    let sortKey = "name", sortDir = 1;
+
+    function fetchAt(heights) {
+      const q = new URLSearchParams({
+        latitude: resorts.map(r => r.lat).join(),
+        longitude: resorts.map(r => r.lng).join(),
+        elevation: heights.join(),
+        current: "temperature_2m,snow_depth",
+        daily: "snowfall_sum",
+        past_days: 7,
+        forecast_days: 7,
+        timezone: "auto"
+      });
+      return fetch("https://api.open-meteo.com/v1/forecast?" + q).then(res => {
+        if (!res.ok) throw new Error(`Open-Meteo returned ${res.status}`);
+        return res.json();
+      });
+    }
+
+    function render() {
+      const sorted = [...rows].sort((a, b) => {
+        const x = a[sortKey], y = b[sortKey];
+        if (typeof x === "string") return x.localeCompare(y) * sortDir;
+        return ((x ?? -Infinity) - (y ?? -Infinity)) * sortDir;
+      });
+      rowsEl.innerHTML = sorted.map(r => `<tr>
+        <td>${r.name} <span class="country">${r.country}</span></td>
+        <td class="num">${cm(r.topDepth)}</td>
+        <td class="num">${cm(r.baseDepth)}</td>
+        <td class="num">${cm(r.past7)}</td>
+        <td class="num">${cm(r.next7)}</td>
+        <td class="num">${deg(r.topTemp)}</td>
+      </tr>`).join("");
+    }
+
+    document.querySelectorAll("th[data-sort]").forEach(th => th.onclick = () => {
+      const key = th.dataset.sort;
+      // Names sort A–Z first; numbers sort biggest first
+      sortDir = key === sortKey ? -sortDir : (key === "name" ? 1 : -1);
+      sortKey = key;
+      render();
+    });
+
+    render();
+
+    Promise.all([
+      fetchAt(resorts.map(r => elevations(r)[1])),
+      fetchAt(resorts.map(r => elevations(r)[0]))
+    ]).then(([top, base]) => {
+      rows = resorts.map((r, i) => ({
+        name: r.name,
+        country: r.country,
+        topDepth: top[i].current.snow_depth * 100,
+        baseDepth: base[i].current.snow_depth * 100,
+        // daily[0..6] are the past 7 days, daily[7] is today, daily[7..13] the coming week
+        past7: sum(top[i].daily.snowfall_sum.slice(0, 7)),
+        next7: sum(top[i].daily.snowfall_sum.slice(7)),
+        topTemp: top[i].current.temperature_2m
+      }));
+      statusEl.textContent = `Updated ${new Date().toLocaleString()}.`;
+      render();
+    }).catch(err => {
+      statusEl.textContent = `Couldn't load snow data (${err.message}). Try again later.`;
+    });
   </script>
 </body>
 </html>
